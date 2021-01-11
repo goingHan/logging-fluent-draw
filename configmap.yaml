@@ -14,7 +14,7 @@ data:
     <source>
       @id fluentd-containers.log
       @type tail
-      path /var/log/containers/nginx*.log
+      path /var/log/containers/*.log
       pos_file /var/log/es-containers.log.pos
       tag raw.kubernetes.*
       read_from_head true
