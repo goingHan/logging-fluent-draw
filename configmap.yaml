@@ -1,0 +1,73 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: fluentd-es-config-v0.1.4
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+data:
+  system.conf: |-
+    <system>
+      root_dir /tmp/fluentd-buffers/
+    </system>
+  containers.input.conf: |-
+    <source>
+      @id fluentd-containers.log
+      @type tail
+      path /var/log/containers/nginx*.log
+      pos_file /var/log/es-containers.log.pos
+      tag raw.kubernetes.*
+      read_from_head true
+      <parse>
+        @type multi_format
+        <pattern>
+          format json
+          time_key time
+        </pattern>
+        <pattern>
+          format /^(?<time>.+) (?<stream>stdout|stderr) [^ ]* (?<log>.*)$/
+        </pattern>
+      </parse>
+    </source>
+    <match raw.kubernetes.**>
+      @id raw.kubernetes
+      @type detect_exceptions
+      remove_tag_prefix raw
+      message log
+      stream stream
+      multiline_flush_interval 5
+      max_bytes 500000
+      max_lines 1000
+    </match>
+  output.conf: |-
+    <filter kubernetes.**>
+      @type kubernetes_metadata
+    </filter>
+    <match **>
+      @type copy
+      <store>
+        @type file
+        path /var/log/test.log
+        <format>
+        localtime false
+        </format>
+        <buffer time>
+        timekey_wait 10m
+        timekey 86400
+        timekey_use_utc true
+        path /var/log/fluent/myapp
+        </buffer>
+        <inject>
+        time_format %Y%m%dT%H%M%S%z
+        localtime false
+        </inject>
+      </store>
+      <store>
+        @id fluentd-filter
+        @type forward
+        <server>
+          name fluentd-filter
+          host fluent-filter-fluentd 
+        </server>
+      </store>
+    </match>
